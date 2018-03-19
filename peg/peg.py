@@ -1055,8 +1055,8 @@ Primary    <- Identifier !LEFTARROW
             / Tag
 
 # Lexical syntax
-Identifier  <- IdentStart @Identifier<< IdentCont* Spacing
-Tag         <- "@"~ IdentStart @Tag<< IdentCont* Spacing
+Identifier  <- IdentStart IdentCont* @Identifier<< Spacing
+Tag         <- "@"~ IdentStart IdentCont* @Tag<< Spacing
 IdentStart  <- [a-zA-Z_]
 IdentCont   <- IdentStart / [0-9]
 

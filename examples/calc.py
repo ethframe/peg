@@ -9,7 +9,7 @@ def main():
         Mult   <- Term ((MUL / DIV)<:left Term:right)*
         Term   <- LP Expr RP / Number / NEG Term:expr
 
-        Number <- ([0] @Number<< / [1-9] @Number<< [0-9]*) _
+        Number <- ([0] / [1-9] [0-9]*) @Number<< _
 
         ADD    <- "+"~ _ @Add
         SUB    <- "-"~ _ @Sub
