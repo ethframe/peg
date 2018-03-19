@@ -5,16 +5,17 @@ def main():
     grammar = parse_grammar("""
         Start  <- _ Expr !.
 
-        Expr   <- Mult ((ADD @Add<:left / SUB @Sub<:left) Mult:right)*
-        Mult   <- Term ((MUL @Mul<:left / DIV @Div<:left) Term:right)*
-        Term   <- LP Expr RP / Number
+        Expr   <- Mult ((ADD / SUB)<:left Mult:right)*
+        Mult   <- Term ((MUL / DIV)<:left Term:right)*
+        Term   <- LP Expr RP / Number / NEG Term:expr
 
-        Number <- @Number "-"? [0-9]* _
+        Number <- ([0] @Number<< / [1-9] @Number<< [0-9]*) _
 
-        ADD    <- "+"~ _
-        SUB    <- "-"~ _
-        MUL    <- "*"~ _
-        DIV    <- "/"~ _
+        ADD    <- "+"~ _ @Add
+        SUB    <- "-"~ _ @Sub
+        MUL    <- "*"~ _ @Mul
+        DIV    <- "/"~ _ @Div
+        NEG    <- "-"~ _ @Neg
         LP     <- "("~ _
         RP     <- ")"~ _
         _      <- ([ \t\r\n]*)~
@@ -33,6 +34,9 @@ def main():
         def visit_Div(self, node):
             return self.visit(node["left"]) / self.visit(node["right"])
 
+        def visit_Neg(self, node):
+            return -self.visit(node["expr"])
+
         def visit_Number(self, node):
             return int(node.value)
 
@@ -43,6 +47,10 @@ def main():
     print(visitor.visit(tree))
 
     tree, _ = grammar.parse("(2 + 2) * 2")
+    print(tree)
+    print(visitor.visit(tree))
+
+    tree, _ = grammar.parse("(2 + -2) * 2")
     print(tree)
     print(visitor.visit(tree))
 
