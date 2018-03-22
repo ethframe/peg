@@ -1,224 +1,10 @@
-__all__ = ("parse_grammar", "Visitor", "META_GRAMMAR", "MetaGrammarVisitor",
+from .analysis import validate
+from .visitor import *
+from .tree import *
+
+
+__all__ = ("parse_grammar", "META_GRAMMAR", "MetaGrammarVisitor",
            "metagrammar")
-
-
-class Empty:
-    __slots__ = ()
-
-    def append(self, name, other):
-        return Container([(name, other.finalize())])
-
-    def extend(self, other):
-        if isinstance(other, (String, Term)):
-            return String(other._value)
-        if isinstance(other, (Container, Node)):
-            return Container(other._values)
-        return self
-
-    def rappend(self, name, other):
-        return Container([(name, other.finalize())])
-
-    def rextend(self, other):
-        if isinstance(other, (String, Term)):
-            return String(other._value)
-        if isinstance(other, (Container, Node)):
-            return Container(other._values)
-        return self
-
-
-class Named:
-    __slots__ = ("_name",)
-
-    def __init__(self, name):
-        self._name = name
-
-    def finalize(self):
-        return FinalizedNamed(self._name)
-
-    def append(self, name, other):
-        return Node(self._name, [(name, other.finalize())])
-
-    def extend(self, other):
-        if isinstance(other, (String, Term)):
-            return Term(self._name, other._value)
-        if isinstance(other, (Container, Node)):
-            return Node(self._name, other._values)
-        raise TypeError()
-
-    def rappend(self, name, other):
-        return Node(self._name, [(name, other.finalize())])
-
-    def rextend(self, other):
-        if isinstance(other, (String, Term)):
-            return Term(self._name, other._value)
-        if isinstance(other, (Container, Node)):
-            return Node(self._name, other._values)
-        raise TypeError()
-
-
-class FinalizedNamed:
-    __slots__ = ("_name",)
-
-    def __init__(self, name):
-        self._name = name
-
-    def __str__(self):
-        return self._name
-
-    def __eq__(self, other):
-        return type(self) == type(other) and self._name == other._name
-
-    @property
-    def name(self):
-        return self._name
-
-
-class String:
-    __slots__ = ("_value",)
-
-    def __init__(self, value):
-        self._value = value
-
-    def append(self, name, other):
-        raise TypeError()
-
-    def extend(self, other):
-        return String(self._value + other._value)
-
-    def rappend(self, name, other):
-        raise TypeError()
-
-    def rextend(self, other):
-        return String(other._value + self._value)
-
-
-class Term:
-    __slots__ = ("_name", "_value")
-
-    def __init__(self, name, value):
-        self._name = name
-        self._value = value
-
-    def finalize(self):
-        return FinalizedTerm(self._name, self._value)
-
-    def append(self, name, other):
-        raise TypeError()
-
-    def extend(self, other):
-        return Term(self._name, self._value + other._value)
-
-    def rappend(self, name, other):
-        raise TypeError()
-
-    def rextend(self, other):
-        return Term(self._name, other._value + self._value)
-
-
-class FinalizedTerm:
-    __slots__ = ("_name", "_value")
-
-    def __init__(self, name, value):
-        self._name = name
-        self._value = value
-
-    def __str__(self):
-        return "{}({!r})".format(self._name, self._value)
-
-    def __eq__(self, other):
-        return type(self) == type(other) and self._name == other._name and \
-            self._value == other._value
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def value(self):
-        return self._value
-
-
-class Container:
-    __slots__ = ("_values",)
-
-    def __init__(self, values):
-        self._values = values
-
-    def append(self, name, other):
-        return Container(self._values + [(name, other.finalize())])
-
-    def extend(self, other):
-        return Container(self._values + other._values)
-
-    def rappend(self, name, other):
-        return Container([(name, other.finalize())] + self._values)
-
-    def rextend(self, other):
-        return Container(other._values + self._values)
-
-
-class Node:
-    __slots__ = ("_name", "_values")
-
-    def __init__(self, name, values):
-        self._name = name
-        self._values = values
-
-    def finalize(self):
-        return FinalizedNode(self._name, self._values)
-
-    def append(self, name, other):
-        return Node(self._name, self._values + [(name, other.finalize())])
-
-    def extend(self, other):
-        return Node(self._name, self._values + other._values)
-
-    def rappend(self, name, other):
-        return Node(self._name, [(name, other.finalize())] + self._values)
-
-    def rextend(self, other):
-        return Node(self._name, other._values + self._values)
-
-
-class FinalizedNode:
-    __slots__ = ("_name", "_values", "_values_dict", "_single_values")
-
-    def __init__(self, name, values):
-        self._name = name
-        self._values = values
-        self._values_dict = {}
-        for n, v in values:
-            self._values_dict.setdefault(n, []).append(v)
-        self._single_values = {
-            n: vs[0] for n, vs in self._values_dict.items() if len(vs) == 1
-        }
-
-    def __str__(self):
-        if len(self._values) == 0:
-            return "{}()".format(self._name)
-        return "{}(\n    {})".format(
-            self._name,
-            ",\n".join("{}={}".format(*v)
-                       for v in self._values).replace("\n", "\n    "))
-
-    def __eq__(self, other):
-        return type(self) == type(other) and self._name == other._name and \
-            self._values == other._values
-
-    @property
-    def name(self):
-        return self._name
-
-    def values(self, item):
-        return self._values_dict[item]
-
-    def __getitem__(self, item):
-        return self._single_values[item]
-
-
-class Visitor:
-    def visit(self, node):
-        return getattr(self, "visit_" + node._name)(node)
 
 
 class Expression:
@@ -271,12 +57,6 @@ class Epsilon(Expression):
     def _parse(self, s, tree):
         return tree, s
 
-    def nullable(self):
-        return True
-
-    def well_formed(self):
-        return True
-
 
 class Nothing(Expression):
     __slots__ = ()
@@ -286,12 +66,6 @@ class Nothing(Expression):
 
     def _parse(self, s, tree):
         return None, s
-
-    def nullable(self):
-        return False
-
-    def well_formed(self):
-        return True
 
 
 class Any(Expression):
@@ -304,12 +78,6 @@ class Any(Expression):
         if s:
             return tree.extend(String(s[0])), s[1:]
         return None, s
-
-    def nullable(self):
-        return False
-
-    def well_formed(self):
-        return True
 
 
 class Literal(Expression):
@@ -325,12 +93,6 @@ class Literal(Expression):
         if s.startswith(self._lit):
             return tree.extend(String(self._lit)), s[len(self._lit):]
         return None, s
-
-    def nullable(self):
-        return False
-
-    def well_formed(self):
-        return True
 
 
 class CharRange(Expression):
@@ -348,12 +110,6 @@ class CharRange(Expression):
             return tree.extend(String(s[0])), s[1:]
         return None, s
 
-    def nullable(self):
-        return False
-
-    def well_formed(self):
-        return True
-
 
 class CharSet(Expression):
     __slots__ = ("_chars",)
@@ -365,12 +121,6 @@ class CharSet(Expression):
         if s and s[0] in self._chars:
             return tree.extend(String(s[0])), s[1:]
         return None, s
-
-    def nullable(self):
-        return False
-
-    def well_formed(self):
-        return True
 
 
 class Sequence(Expression):
@@ -397,16 +147,6 @@ class Sequence(Expression):
             return None, s
         return res, tail
 
-    def nullable(self):
-        return self._first.nullable() and self._second.nullable()
-
-    def well_formed(self):
-        if not self._first.well_formed():
-            return False
-        if not self._first.nullable():
-            return True
-        return self._second.well_formed()
-
 
 class Choice(Expression):
     __slots__ = ("_first", "_second")
@@ -423,12 +163,6 @@ class Choice(Expression):
         if res is not None:
             return res, tail
         return self._second._parse(s, tree)
-
-    def nullable(self):
-        return self._first.nullable() or self._second.nullable()
-
-    def well_formed(self):
-        return self._first.well_formed() and self._second.well_formed()
 
 
 class Repeat(Expression):
@@ -451,12 +185,6 @@ class Repeat(Expression):
                 return tree, s
             s = tail
             tree = res
-
-    def nullable(self):
-        return True
-
-    def well_formed(self):
-        return not self._expr.nullable() and self._expr.well_formed()
 
 
 class Repeat1(Expression):
@@ -485,12 +213,6 @@ class Repeat1(Expression):
             s = tail
             tree = res
 
-    def nullable(self):
-        return False
-
-    def well_formed(self):
-        return not self._expr.nullable() and self._expr.well_formed()
-
 
 class Optional(Expression):
     __slots__ = ("_expr",)
@@ -510,12 +232,6 @@ class Optional(Expression):
         if res is None:
             return tree, s
         return res, tail
-
-    def nullable(self):
-        return True
-
-    def well_formed(self):
-        return self._expr.well_formed()
 
 
 class And(Expression):
@@ -537,12 +253,6 @@ class And(Expression):
             return tree, s
         return None, s
 
-    def nullable(self):
-        return self._expr.nullable()
-
-    def well_formed(self):
-        return self._expr.well_formed()
-
 
 class Not(Expression):
     __slots__ = ("_expr",)
@@ -563,12 +273,6 @@ class Not(Expression):
             return tree, s
         return None, s
 
-    def nullable(self):
-        return not self._expr.nullable()
-
-    def well_formed(self):
-        return self._expr.well_formed()
-
 
 class Ignore(Expression):
     __slots__ = ("_expr",)
@@ -588,12 +292,6 @@ class Ignore(Expression):
         if res is None:
             return None, s
         return tree, tail
-
-    def nullable(self):
-        return self._expr.nullable()
-
-    def well_formed(self):
-        return self._expr.well_formed()
 
 
 class Append(Expression):
@@ -616,12 +314,6 @@ class Append(Expression):
             return None, s
         return tree.append(self._name, res), tail
 
-    def nullable(self):
-        return self._expr.nullable()
-
-    def well_formed(self):
-        return self._expr.well_formed()
-
 
 class Extend(Expression):
     __slots__ = ("_expr",)
@@ -634,12 +326,6 @@ class Extend(Expression):
         if res is None:
             return None, s
         return tree.extend(res), tail
-
-    def nullable(self):
-        return self._expr.nullable()
-
-    def well_formed(self):
-        return self._expr.well_formed()
 
 
 class Rappend(Expression):
@@ -662,12 +348,6 @@ class Rappend(Expression):
             return None, s
         return res.rappend(self._name, tree), tail
 
-    def nullable(self):
-        return self._expr.nullable()
-
-    def well_formed(self):
-        return self._expr.well_formed()
-
 
 class Rextend(Expression):
     __slots__ = ("_expr",)
@@ -688,12 +368,6 @@ class Rextend(Expression):
             return None, s
         return res.rextend(tree), tail
 
-    def nullable(self):
-        return self._expr.nullable()
-
-    def well_formed(self):
-        return self._expr.well_formed()
-
 
 class Tag(Expression):
     __slots__ = ("_name",)
@@ -707,18 +381,11 @@ class Tag(Expression):
     def _parse(self, s, tree):
         return Named(self._name), s
 
-    def nullable(self):
-        return True
-
-    def well_formed(self):
-        return True
-
 
 class Grammar(object):
 
     def __init__(self):
         self._rules = {}
-        self._undefined = set()
 
     def __str__(self):
         rules = ["g = Grammar()"]
@@ -728,67 +395,22 @@ class Grammar(object):
 
     def __call__(self, name, body=None):
         if body is not None:
-            self._undefined.discard(name)
             self._rules[name] = body
-        elif name not in self._rules:
-            self._undefined.add(name)
         return Rule(name, lambda: self._rules[name])
-
-    def validate(self):
-        if self._undefined:
-            raise ValueError(
-                "Missing definitions for rules: {}".format(
-                    ", ".join(sorted(self._undefined))))
-        not_wf = []
-        for n, r in self._rules.items():
-            if not r.well_formed():
-                not_wf.append(n)
-        if not_wf:
-            raise ValueError(
-                "Rules {} is not well-formed".format(
-                    ", ".join(sorted(not_wf))))
 
 
 class Rule(Expression):
-    __slots__ = ("_name", "_lazy", "_nullable", "_well_formed")
+    __slots__ = ("_name", "_lazy")
 
     def __init__(self, name, lazy):
         self._name = name
         self._lazy = lazy
-        self._nullable = None
-        self._well_formed = None
 
     def __str__(self):
         return "g({!r})".format(self._name)
 
     def _parse(self, s, tree):
         return self._lazy()._parse(s, tree)
-
-    def nullable(self):
-        if self._nullable is None:
-            self._nullable = True
-            expr = self._lazy()
-            for _ in range(100):
-                new = expr.nullable()
-                if new == self._nullable:
-                    break
-                self._nullable = new
-            else:
-                raise RuntimeError("Fixpoint calculation exhausted")
-        return self._nullable
-
-    def well_formed(self):
-        if self._well_formed is None:
-            self._well_formed = False
-            expr = self._lazy()
-            for _ in range(100):
-                new = expr.well_formed()
-                if new == self._well_formed:
-                    break
-                self._well_formed = new
-            else:
-                raise RuntimeError("Fixpoint calculation exhausted")
-        return self._well_formed
 
 
 class _BootstrapGrammarVisitor(Visitor):
@@ -802,7 +424,6 @@ class _BootstrapGrammarVisitor(Visitor):
         rules = node.values("rule")
         for rule in rules:
             self.visit(rule)
-        self.grammar.validate()
         if rules:
             self.start = self.grammar(rules[0]["name"].value)
         return self.start
@@ -935,7 +556,7 @@ def _make_bootstrap_grammar():
         g('Primary') *
         ((g('LAPPEND') * Tag('Append') |
           g('RAPPEND') * Tag('Rappend')).rapp('expr') *
-         g('Identifier').app('name') |
+         g('TreeIdent').app('name') |
          (g('LEXTEND') * Tag('Extend') |
           g('REXTEND') * Tag('Rextend') |
           g('IGNORE') * Tag('Ignore')).rapp('expr')).opt())
@@ -945,6 +566,9 @@ def _make_bootstrap_grammar():
         g('Literal') | g('Class') | g('Any') | g('Tag'))
     g('Identifier',
         g('IdentStart') * Tag('Identifier').rext() *
+        g('IdentCont').rep() * g('Spacing'))
+    g('TreeIdent',
+        g('IdentStart') * Tag('TreeIdent').rext() *
         g('IdentCont').rep() * g('Spacing'))
     g('Tag',
         Literal('@').ign() * g('IdentStart') *
@@ -1027,7 +651,6 @@ def _make_bootstrap_grammar():
         Literal('\r\n').ign() | Literal('\n').ign() | Literal('\r').ign())
     g('EndOfFile',
         ~Any())
-    g.validate()
     return g("Grammar")
 
 
@@ -1045,7 +668,7 @@ Suffix     <- AstOp (QUESTION @Optional /
                      STAR @Repeat /
                      PLUS @Repeat1)<:expr?
 AstOp      <- Primary ((LAPPEND @Append /
-                        RAPPEND @Rappend)<:expr Identifier:name /
+                        RAPPEND @Rappend)<:expr TreeIdent:name /
                        (LEXTEND @Extend /
                         REXTEND @Rextend /
                         IGNORE @Ignore)<:expr)?
@@ -1056,6 +679,7 @@ Primary    <- Identifier !LEFTARROW
 
 # Lexical syntax
 Identifier  <- IdentStart IdentCont* @Identifier<< Spacing
+TreeIdent   <- IdentStart IdentCont* @TreeIdent<< Spacing
 Tag         <- "@"~ IdentStart IdentCont* @Tag<< Spacing
 IdentStart  <- [a-zA-Z_]
 IdentCont   <- IdentStart / [0-9]
@@ -1103,6 +727,7 @@ def _make_metagrammar():
     bootstrap = _make_bootstrap_grammar()
     tree, rest = bootstrap.parse(META_GRAMMAR)
     assert tree and not rest
+    validate(tree)
     visitor = MetaGrammarVisitor()
     visitor.visit(tree)
     return visitor.start
@@ -1115,6 +740,7 @@ def parse_grammar(source):
     tree, rest = metagrammar.parse(source)
     if tree is None:
         raise ValueError()
+    validate(tree)
     visitor = MetaGrammarVisitor()
     visitor.visit(tree)
     return visitor.start
