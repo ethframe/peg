@@ -1,0 +1,62 @@
+# Based on Ford`s original grammar for PEGs
+
+# Hierarchical syntax
+Grammar    <- @Grammar Spacing Definition:rule+ EndOfFile
+Definition <- Identifier LEFTARROW @Rule<:name Expression:body
+
+Expression <- Sequence (SLASH @Choice<:alt Sequence:alt (SLASH Sequence:alt)*)?
+Sequence   <- Prefix (@Sequence<:item Prefix:item Prefix:item*)? / @Epsilon
+Prefix     <- (AND @And / NOT @Not) Suffix:expr / Suffix
+Suffix     <- AstOp (QUESTION @Optional /
+                     STAR @Repeat /
+                     PLUS @Repeat1)<:expr?
+AstOp      <- Primary ((LAPPEND @Append /
+                        RAPPEND @Rappend)<:expr TreeIdent:name /
+                       (LEXTEND @Extend /
+                        REXTEND @Rextend /
+                        IGNORE @Ignore)<:expr)?
+Primary    <- Identifier !LEFTARROW
+            / OPEN Expression CLOSE
+            / Literal / Class / Any
+            / Tag
+
+# Lexical syntax
+Identifier  <- IdentStart IdentCont* @Identifier<< Spacing
+TreeIdent   <- IdentStart IdentCont* @TreeIdent<< Spacing
+Tag         <- "@"~ IdentStart IdentCont* @Tag<< Spacing
+IdentStart  <- [a-zA-Z_]
+IdentCont   <- IdentStart / [0-9]
+
+Literal     <- [']~ @Literal (!['] Char:char)* [']~ Spacing
+             / ["]~ @Literal (!["] Char:char)* ["]~ Spacing
+Class       <- '['~ (!']' Range
+                     (!']' @Class<:item Range:item (!']' Range:item)*)? /
+                     @Nothing) ']'~ Spacing
+Range       <- Char '-'~ @Range<:start Char:end / Char @Char<:char
+Char        <- '\\'~ [nrt'"\[\]\\] @escape<<
+             / '\\'~ [0-2][0-7][0-7] @octal<<
+             / '\\'~ [0-7][0-7]? @octal<<
+             / !'\\' . @char<<
+Any         <- DOT @Any
+
+LEFTARROW   <- '<-'~ Spacing
+SLASH       <- '/'~ Spacing
+AND         <- '&'~ Spacing
+NOT         <- '!'~ Spacing
+QUESTION    <- '?'~ Spacing
+STAR        <- '*'~ Spacing
+PLUS        <- '+'~ Spacing
+OPEN        <- '('~ Spacing
+CLOSE       <- ')'~ Spacing
+DOT         <- '.'~ Spacing
+LEXTEND     <- '>>'~ Spacing
+REXTEND     <- '<<'~ Spacing
+LAPPEND     <- ':'~ Spacing
+RAPPEND     <- '<:'~ Spacing
+IGNORE      <- '~'~ Spacing
+
+Spacing     <- (Space / Comment)*
+Comment     <- '#'~ (!EndOfLine .~)* EndOfLine
+Space       <- ' '~ / '\t'~ / EndOfLine
+EndOfLine   <- '\r\n'~ / '\n'~ / '\r'~
+EndOfFile   <- !.
