@@ -352,7 +352,13 @@ class LazyOp(TypeOp):
         if top in self._input:
             return self._input[top]
         self._input[top] = None
-        r = self._input[top] = self._lazy().process(t)
+        o = self._input[top] = self._lazy().process(t)
+        if o is None:
+            return None
+        r = self._lazy().process(t)
+        while r.top() != o.top():
+            o = self._input[top] = r
+            r = self._lazy().process(t)
         return r
 
 
