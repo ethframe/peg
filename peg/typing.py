@@ -227,21 +227,13 @@ class TypeOp:
     def __init__(self):
         self._input = {}
 
-    def process(self, t):
-        top = t.top()
-        if top in self._input:
-            return self._input[top]
-        self._input[top] = None
-        r = self._input[top] = self._process(t)
-        return r
-
 
 class TagOp(TypeOp):
     def __init__(self, name):
         super().__init__()
         self._name = name
 
-    def _process(self, t):
+    def process(self, t):
         return NamedType(self._name)
 
 
@@ -251,7 +243,7 @@ class AppendOp(TypeOp):
         self._op = op
         self._name = name
 
-    def _process(self, t):
+    def process(self, t):
         r = self._op.process(EmptyType())
         if r is None:
             return None
@@ -264,7 +256,7 @@ class RappendOp(TypeOp):
         self._op = op
         self._name = name
 
-    def _process(self, t):
+    def process(self, t):
         r = self._op.process(EmptyType())
         if r is None:
             return None
@@ -276,7 +268,7 @@ class ExtendOp(TypeOp):
         super().__init__()
         self._op = op
 
-    def _process(self, t):
+    def process(self, t):
         r = self._op.process(EmptyType())
         if r is None:
             return None
@@ -288,7 +280,7 @@ class RextendOp(TypeOp):
         super().__init__()
         self._op = op
 
-    def _process(self, t):
+    def process(self, t):
         r = self._op.process(EmptyType())
         if r is None:
             return None
@@ -300,7 +292,7 @@ class RepeatOp(TypeOp):
         super().__init__()
         self._op = op
 
-    def _process(self, t):
+    def process(self, t):
         res = [t]
         tops = set([t.top()])
         t = self._op.process(t)
@@ -316,7 +308,7 @@ class SequenceOp(TypeOp):
         super().__init__()
         self._ops = ops
 
-    def _process(self, t):
+    def process(self, t):
         for op in self._ops:
             t = op.process(t)
             if t is None:
@@ -329,7 +321,7 @@ class ChoiceOp(TypeOp):
         super().__init__()
         self._ops = ops
 
-    def _process(self, t):
+    def process(self, t):
         res = []
         for op in self._ops:
             r = op.process(t)
@@ -341,12 +333,12 @@ class ChoiceOp(TypeOp):
 
 
 class NoOp(TypeOp):
-    def _process(self, t):
+    def process(self, t):
         return t
 
 
 class StringOp(TypeOp):
-    def _process(self, t):
+    def process(self, t):
         return t.extend(StringType())
 
 
@@ -355,8 +347,13 @@ class LazyOp(TypeOp):
         super().__init__()
         self._lazy = lazy
 
-    def _process(self, t):
-        return self._lazy().process(t)
+    def process(self, t):
+        top = t.top()
+        if top in self._input:
+            return self._input[top]
+        self._input[top] = None
+        r = self._input[top] = self._lazy().process(t)
+        return r
 
 
 class TypingVisitor(Visitor):

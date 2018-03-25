@@ -17,10 +17,10 @@ def main():
         _      <- [ \t]~*
     """)
     test("""
-        Foo    <- @Foo (@Bar "a"):baz*
+        List   <- @List (@Item "a"):item*
     """)
     test("""
-        List    <- @List ((@Item "a"):fst List:snd / @None)
+        List   <- @List (@Item "a"):fst List:snd / @Empty
     """)
 
 
