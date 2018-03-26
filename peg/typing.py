@@ -8,13 +8,21 @@ class Type:
     def __eq__(self, other):
         raise NotImplementedError()
 
+    def __lt__(self, other):
+        raise NotImplementedError()
+
     def __hash__(self):
         raise NotImplementedError()
 
 
 class EmptyType(Type):
+    _order = 0
+
     def __eq__(self, other):
         return type(self) is type(other)
+
+    def __lt__(self, other):
+        return self._order < other._order
 
     def __hash__(self):
         return hash(type(self))
@@ -29,11 +37,17 @@ class EmptyType(Type):
 
 
 class NamedType(Type):
+    _order = 1
+
     def __init__(self, name):
         self._name = name
 
     def __eq__(self, other):
         return type(self) is type(other) and self._name == other._name
+
+    def __lt__(self, other):
+        return self._order < other._order or self._order == other._order and \
+            self._name < other._name
 
     def __hash__(self):
         return hash((type(self), self._name))
@@ -74,8 +88,13 @@ class NamedType(Type):
 
 
 class StringType(Type):
+    _order = 2
+
     def __eq__(self, other):
         return type(self) is type(other)
+
+    def __lt__(self, other):
+        return self._order < other._order
 
     def __hash__(self):
         return hash(type(self))
@@ -90,15 +109,21 @@ class StringType(Type):
 
 
 class ContainerType(Type):
-    pass
+    _order = 3
 
 
 class TermType(Type):
+    _order = 4
+
     def __init__(self, name):
         self._name = name
 
     def __eq__(self, other):
         return type(self) is type(other) and self._name == other._name
+
+    def __lt__(self, other):
+        return self._order < other._order or self._order == other._order and \
+            self._name < other._name
 
     def __hash__(self):
         return hash((type(self), self._name))
@@ -122,6 +147,8 @@ class TermType(Type):
 
 
 class NodeType(Type):
+    _order = 5
+
     def __init__(self, name, values):
         self._name = name
         self._values = tuple(values)
@@ -129,6 +156,11 @@ class NodeType(Type):
     def __eq__(self, other):
         return type(self) is type(other) and self._name == other._name \
             and self._values == other._values
+
+    def __lt__(self, other):
+        return self._order < other._order or self._order == other._order and \
+            (self._name < other._name or self._name == other._name and
+             self._values < other._values)
 
     def __hash__(self):
         return hash((type(self), self._name, self._values))
@@ -191,11 +223,17 @@ def _mk_or(ts):
 
 
 class OrType(Type):
+    _order = 6
+
     def __init__(self, ts):
-        self._ts = tuple(ts)
+        self._ts = tuple(sorted(ts))
 
     def __eq__(self, other):
         return type(self) is type(other) and self._ts == other._ts
+
+    def __lt__(self, other):
+        return self._order < other._order or self._order == other._order and \
+            self._ts < other._ts
 
     def __hash__(self):
         return hash(self._ts)
@@ -224,13 +262,11 @@ class OrType(Type):
 
 
 class TypeOp:
-    def __init__(self):
-        self._input = {}
+    pass
 
 
 class TagOp(TypeOp):
     def __init__(self, name):
-        super().__init__()
         self._name = name
 
     def process(self, t):
@@ -239,7 +275,6 @@ class TagOp(TypeOp):
 
 class AppendOp(TypeOp):
     def __init__(self, op, name):
-        super().__init__()
         self._op = op
         self._name = name
 
@@ -252,7 +287,6 @@ class AppendOp(TypeOp):
 
 class RappendOp(TypeOp):
     def __init__(self, op, name):
-        super().__init__()
         self._op = op
         self._name = name
 
@@ -265,7 +299,6 @@ class RappendOp(TypeOp):
 
 class ExtendOp(TypeOp):
     def __init__(self, op):
-        super().__init__()
         self._op = op
 
     def process(self, t):
@@ -277,7 +310,6 @@ class ExtendOp(TypeOp):
 
 class RextendOp(TypeOp):
     def __init__(self, op):
-        super().__init__()
         self._op = op
 
     def process(self, t):
@@ -289,7 +321,6 @@ class RextendOp(TypeOp):
 
 class RepeatOp(TypeOp):
     def __init__(self, op):
-        super().__init__()
         self._op = op
 
     def process(self, t):
@@ -305,7 +336,6 @@ class RepeatOp(TypeOp):
 
 class SequenceOp(TypeOp):
     def __init__(self, ops):
-        super().__init__()
         self._ops = ops
 
     def process(self, t):
@@ -318,7 +348,6 @@ class SequenceOp(TypeOp):
 
 class ChoiceOp(TypeOp):
     def __init__(self, ops):
-        super().__init__()
         self._ops = ops
 
     def process(self, t):
@@ -343,23 +372,36 @@ class StringOp(TypeOp):
 
 
 class LazyOp(TypeOp):
-    def __init__(self, lazy):
-        super().__init__()
+    def __init__(self, name, lazy):
+        self._name = name
         self._lazy = lazy
+
+    def process(self, t):
+        return self._lazy().process(t)
+
+
+class MemoOp(TypeOp):
+    def __init__(self, op):
+        self._op = op
+        self._input = {}
+        self._old = {}
 
     def process(self, t):
         top = t.top()
         if top in self._input:
             return self._input[top]
         self._input[top] = None
-        o = self._input[top] = self._lazy().process(t)
+        o = self._input[top] = self._op.process(t)
         if o is None:
             return None
-        r = self._lazy().process(t)
+        r = self._op.process(t)
         while r.top() != o.top():
             o = self._input[top] = r
-            r = self._lazy().process(t)
-        return r
+            r = self._op.process(t)
+        if self._input[top].top() != self._old.get(top, None):
+            self._old[top] = self._input[top].top()
+            del self._input[top]
+        return o
 
 
 class TypingVisitor(Visitor):
@@ -370,7 +412,7 @@ class TypingVisitor(Visitor):
         rules = node.values("rule")
         for rule in rules:
             expr = self.visit(rule["body"])
-            self._types[rule["name"].value] = expr
+            self._types[rule["name"].value] = MemoOp(expr)
         return self._types[rules[0]["name"].value].process(EmptyType())
 
     def visit_Sequence(self, node):
@@ -386,7 +428,7 @@ class TypingVisitor(Visitor):
         return ChoiceOp(alts)
 
     def visit_Identifier(self, node):
-        return LazyOp(lambda: self._types[node.value])
+        return LazyOp(node.value, lambda: self._types[node.value])
 
     def visit_Repeat(self, node):
         return RepeatOp(self.visit(node["expr"]))
@@ -416,10 +458,19 @@ class TypingVisitor(Visitor):
     def visit_Range(self, node):
         return StringOp()
 
+    def visit_Class(self, node):
+        return StringOp()
+
     def visit_Literal(self, node):
         return StringOp()
 
+    def visit_Any(self, node):
+        return StringOp()
+
     def visit_Ignore(self, node):
+        return NoOp()
+
+    def visit_Not(self, node):
         return NoOp()
 
 

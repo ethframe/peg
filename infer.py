@@ -11,7 +11,8 @@ def test(grammar):
 
 def main():
     test("""
-        Expr   <- Number (Op<:left Number:right)*
+        Expr   <- Term (Op<:left Term:right)*
+        Term   <- "("~ _ Expr ")"~ _ / Number
         Number <- [0-9]>>+ @Number<< _
         Op     <- ("+"~ @Add/"-"~ @Sub) _
         _      <- [ \t]~*
