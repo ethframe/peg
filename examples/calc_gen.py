@@ -57,7 +57,7 @@ class ExpressionVisitor(ClassVisitor):
 
 def main():
     parser = make_parser()
-    tree, rest = parser.parse("2 + 2 * (3 + -1) / 3 * 2")
+    tree, rest = parser.parse("(2 + 2 * (3 + -1)) / 3 * 2")
     assert not rest
     tree = ConverterVisitor().visit(tree)
     print(ExpressionVisitor().visit(tree))
